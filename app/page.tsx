@@ -15,6 +15,7 @@ export default function Home() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false)
   const [winners, setWinners] = useState<Winner[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null)
 
   // Load game from Firebase and listen for real-time updates
   useEffect(() => {
@@ -64,7 +65,7 @@ export default function Home() {
             q3: scores.q3 || { teamA: 0, teamB: 0 },
             final: scores.final || { teamA: 0, teamB: 0 },
           },
-          payouts: (gameData.payouts as Game['payouts']) || { q1: 100, q2: 100, q3: 100, final: 200 },
+          payouts: (gameData.payouts as Game['payouts']) || { q1: 20, q2: 20, q3: 20, final: 40 },
         } as Game)
       } else {
         // No game exists, create one
@@ -228,14 +229,15 @@ export default function Home() {
           ) : (
             <div className="space-y-2">
               {sortedPlayers.map(([name, count]) => (
-                <div
+                <button
                   key={name}
-                  className="flex items-center justify-between gap-2 px-2 py-1.5 rounded"
+                  onClick={() => setSelectedPlayer(name)}
+                  className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:ring-2 hover:ring-white/50 transition-all cursor-pointer"
                   style={{ backgroundColor: getPlayerColor(name, allNames) }}
                 >
                   <span className="text-white text-sm font-medium truncate max-w-[100px]">{name}</span>
                   <span className="text-white/80 text-sm font-bold">{count}</span>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -359,6 +361,89 @@ export default function Home() {
         </div>
       )}
 
+      {/* Player Squares Modal */}
+      {selectedPlayer && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedPlayer(null)}>
+          <div className="bg-slate-800 rounded-xl p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <span 
+                  className="w-4 h-4 rounded"
+                  style={{ backgroundColor: getPlayerColor(selectedPlayer, allNames) }}
+                />
+                {selectedPlayer}&apos;s Squares
+              </h3>
+              <button
+                onClick={() => setSelectedPlayer(null)}
+                className="text-purple-400 hover:text-white text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-purple-300 text-sm mb-4">
+              {playerStats[selectedPlayer] || 0} squares • ${(playerStats[selectedPlayer] || 0) * game.costPerSquare} invested
+            </p>
+            {/* Mini Grid */}
+            <div className="flex justify-center">
+              <div>
+                {/* Column headers */}
+                <div className="flex">
+                  <div className="w-6 h-6"></div>
+                  {(game.colNumbers || Array(10).fill('?')).map((num, i) => (
+                    <div key={i} className="w-6 h-6 flex items-center justify-center text-[10px] text-purple-400 font-bold">
+                      {num}
+                    </div>
+                  ))}
+                </div>
+                {/* Grid rows */}
+                {game.grid.map((row, rowIdx) => (
+                  <div key={rowIdx} className="flex">
+                    <div className="w-6 h-6 flex items-center justify-center text-[10px] text-purple-400 font-bold">
+                      {(game.rowNumbers || Array(10).fill('?'))[rowIdx]}
+                    </div>
+                    {row.map((cell, colIdx) => {
+                      const isPlayerSquare = cell === selectedPlayer
+                      const isWinner = winners.some((w) => w.row === rowIdx && w.col === colIdx && w.name === selectedPlayer)
+                      return (
+                        <div
+                          key={colIdx}
+                          className={`
+                            w-6 h-6 border border-slate-600/50 flex items-center justify-center text-[8px]
+                            ${isPlayerSquare ? 'text-white font-bold' : 'text-slate-600'}
+                            ${isWinner ? 'ring-1 ring-yellow-400' : ''}
+                          `}
+                          style={{ 
+                            backgroundColor: isPlayerSquare 
+                              ? getPlayerColor(selectedPlayer, allNames) 
+                              : 'transparent' 
+                          }}
+                        >
+                          {isPlayerSquare ? '✓' : ''}
+                          {isWinner && <span className="absolute text-[8px]">🏆</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* List their coordinates */}
+            <div className="mt-4 pt-4 border-t border-slate-600">
+              <p className="text-purple-400 text-xs mb-2">Square coordinates:</p>
+              <div className="flex flex-wrap gap-1">
+                {game.grid.flatMap((row, r) => 
+                  row.map((cell, c) => cell === selectedPlayer ? (
+                    <span key={`${r}-${c}`} className="text-xs bg-slate-700 px-2 py-1 rounded text-white">
+                      ({(game.rowNumbers || [])[r] ?? '?'}, {(game.colNumbers || [])[c] ?? '?'})
+                    </span>
+                  ) : null)
+                ).filter(Boolean)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-800/50 rounded-lg p-4 text-center">
@@ -385,14 +470,15 @@ export default function Home() {
           <h3 className="text-white font-bold mb-3 text-sm uppercase tracking-wide">Players</h3>
           <div className="flex flex-wrap gap-2">
             {sortedPlayers.map(([name, count]) => (
-              <div
+              <button
                 key={name}
-                className="flex items-center gap-2 px-3 py-1.5 rounded"
+                onClick={() => setSelectedPlayer(name)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded hover:ring-2 hover:ring-white/50 transition-all cursor-pointer"
                 style={{ backgroundColor: getPlayerColor(name, allNames) }}
               >
                 <span className="text-white text-sm font-medium">{name}</span>
                 <span className="text-white/80 text-xs font-bold bg-black/20 px-1.5 py-0.5 rounded">{count}</span>
-              </div>
+              </button>
             ))}
           </div>
         </div>

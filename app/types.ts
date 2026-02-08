@@ -56,7 +56,7 @@ export function createEmptyGame(): Game {
     teamA: 'Patriots',
     teamB: 'Seahawks',
     costPerSquare: 2,
-    payouts: { q1: 25, q2: 25, q3: 25, final: 25 },
+    payouts: { q1: 20, q2: 20, q3: 20, final: 40 },
     grid: Array(10).fill(null).map(() => Array(10).fill(null)),
     rowNumbers: null,
     colNumbers: null,
