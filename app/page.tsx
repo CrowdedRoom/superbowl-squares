@@ -23,7 +23,36 @@ export default function Home() {
     const unsubscribe = onValue(gameRef, (snapshot) => {
       const data = snapshot.val()
       if (data) {
-        setGame(data as Game)
+        // Firebase converts arrays to objects, so we need to convert them back
+        const gameData = data as Record<string, unknown>
+        
+        // Convert grid back to 2D array
+        let grid: (string | null)[][] = Array(10).fill(null).map(() => Array(10).fill(null))
+        if (gameData.grid) {
+          const gridData = gameData.grid as Record<string, Record<string, string | null>>
+          for (let r = 0; r < 10; r++) {
+            if (gridData[r]) {
+              for (let c = 0; c < 10; c++) {
+                grid[r][c] = gridData[r][c] ?? null
+              }
+            }
+          }
+        }
+        
+        // Convert rowNumbers and colNumbers back to arrays
+        const rowNumbers = gameData.rowNumbers 
+          ? Object.values(gameData.rowNumbers as Record<string, number>)
+          : null
+        const colNumbers = gameData.colNumbers
+          ? Object.values(gameData.colNumbers as Record<string, number>)
+          : null
+        
+        setGame({
+          ...gameData,
+          grid,
+          rowNumbers,
+          colNumbers,
+        } as Game)
       } else {
         // No game exists, create one
         const newGame = createEmptyGame()
@@ -55,9 +84,9 @@ export default function Home() {
   }
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center text-white text-xl">Loading game... 🏈</div>
-  if (!game) return <div className="p-8 text-white">Loading...</div>
+  if (!game || !game.grid) return <div className="p-8 text-white">Loading...</div>
 
-  const allNames = game.grid.flat().filter(Boolean) as string[]
+  const allNames = (game.grid?.flat?.() || []).filter(Boolean) as string[]
   const claimedCount = allNames.length
   const totalPot = claimedCount * game.costPerSquare
 
