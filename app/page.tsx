@@ -10,6 +10,8 @@ export default function Home() {
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null)
   const [playerName, setPlayerName] = useState('')
   const [showAdmin, setShowAdmin] = useState(false)
+  const [adminPassword, setAdminPassword] = useState('')
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false)
   const [winners, setWinners] = useState<Winner[]>([])
 
   // Load game from localStorage
@@ -42,6 +44,13 @@ export default function Home() {
   const claimedCount = allNames.length
   const totalPot = claimedCount * game.costPerSquare
 
+  // Calculate player stats (name -> count)
+  const playerStats = allNames.reduce((acc, name) => {
+    acc[name] = (acc[name] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+  const sortedPlayers = Object.entries(playerStats).sort((a, b) => b[1] - a[1])
+
   function claimSquare() {
     if (!game || !selectedCell || !playerName.trim() || game.isLocked) return
     const newGrid = game.grid.map((row) => [...row])
@@ -58,6 +67,42 @@ export default function Home() {
       rowNumbers: shuffleNumbers(),
       colNumbers: shuffleNumbers()
     })
+  }
+
+  function fillMockData() {
+    if (!game || game.isLocked) return
+    const mockNames = ['Mike', 'Sarah', 'Dave', 'Lisa', 'Tom', 'Emma', 'Jake', 'Amy', 'Chris', 'Megan', 'Brian', 'Katie']
+    const newGrid = game.grid.map((row) => [...row])
+    
+    // Assign 3-8 squares to each person
+    const assignments: { name: string; count: number }[] = mockNames.map((name) => ({
+      name,
+      count: Math.floor(Math.random() * 6) + 3 // 3-8 squares each
+    }))
+    
+    // Get all empty cell positions and shuffle them
+    const emptyCells: { row: number; col: number }[] = []
+    for (let r = 0; r < 10; r++) {
+      for (let c = 0; c < 10; c++) {
+        if (!newGrid[r][c]) emptyCells.push({ row: r, col: c })
+      }
+    }
+    // Shuffle empty cells
+    for (let i = emptyCells.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[emptyCells[i], emptyCells[j]] = [emptyCells[j], emptyCells[i]]
+    }
+    
+    // Fill cells with mock names
+    let cellIndex = 0
+    for (const { name, count } of assignments) {
+      for (let i = 0; i < count && cellIndex < emptyCells.length; i++) {
+        const { row, col } = emptyCells[cellIndex++]
+        newGrid[row][col] = name
+      }
+    }
+    
+    setGame({ ...game, grid: newGrid })
   }
 
   function updateScore(quarter: 'q1' | 'q2' | 'q3' | 'final', team: 'teamA' | 'teamB', value: number) {
@@ -105,20 +150,49 @@ export default function Home() {
         </div>
       )}
 
-      {/* Grid */}
-      <div className="overflow-x-auto mb-6">
-        <div className="inline-block">
+      {/* Grid + Scoreboard */}
+      <div className="flex justify-center gap-4 md:gap-6 mb-6">
+        {/* Player Scoreboard */}
+        <div className="hidden md:block bg-slate-800/50 rounded-xl p-4 min-w-[160px] max-h-[500px] overflow-y-auto">
+          <h3 className="text-white font-bold mb-3 text-sm uppercase tracking-wide">Players</h3>
+          {sortedPlayers.length === 0 ? (
+            <p className="text-purple-400 text-sm">No players yet</p>
+          ) : (
+            <div className="space-y-2">
+              {sortedPlayers.map(([name, count]) => (
+                <div
+                  key={name}
+                  className="flex items-center justify-between gap-2 px-2 py-1.5 rounded"
+                  style={{ backgroundColor: getPlayerColor(name, allNames) }}
+                >
+                  <span className="text-white text-sm font-medium truncate max-w-[100px]">{name}</span>
+                  <span className="text-white/80 text-sm font-bold">{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-4 pt-3 border-t border-slate-600">
+            <div className="flex justify-between text-sm">
+              <span className="text-purple-400">Total</span>
+              <span className="text-white font-bold">{claimedCount}/100</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Grid */}
+        <div className="overflow-x-auto">
+          <div className="inline-block">
           {/* Column numbers (Team B) */}
           <div className="flex">
-            <div className="w-16 md:w-20 h-8 md:h-10"></div>
-            <div className="flex-1 text-center text-white font-bold text-sm md:text-lg mb-1" style={{ width: `${10 * 48}px` }}>
+            <div className="w-12 md:w-28 h-6 md:h-10"></div>
+            <div className="flex-1 text-center text-white font-bold text-xs md:text-lg mb-1">
               {game.teamB} →
             </div>
           </div>
           <div className="flex">
-            <div className="w-16 md:w-20"></div>
+            <div className="w-12 md:w-28"></div>
             {(game.colNumbers || Array(10).fill('?')).map((num, i) => (
-              <div key={i} className="w-10 md:w-12 h-6 md:h-8 flex items-center justify-center text-white font-bold text-sm md:text-base bg-purple-800/50 border-b border-purple-600">
+              <div key={i} className="w-[32px] md:w-12 h-5 md:h-8 flex items-center justify-center text-white font-bold text-[10px] md:text-base bg-purple-800/50 border-b border-purple-600">
                 {num}
               </div>
             ))}
@@ -128,8 +202,8 @@ export default function Home() {
           <div className="flex">
             {/* Row numbers (Team A) */}
             <div className="flex flex-col">
-              <div className="w-16 md:w-20 flex items-center justify-center">
-                <span className="text-white font-bold text-sm md:text-lg transform -rotate-90 whitespace-nowrap">
+              <div className="w-8 md:w-20 flex items-center justify-center">
+                <span className="text-white font-bold text-[10px] md:text-lg transform -rotate-90 whitespace-nowrap">
                   ← {game.teamA}
                 </span>
               </div>
@@ -137,7 +211,7 @@ export default function Home() {
             <div className="flex">
               <div className="flex flex-col">
                 {(game.rowNumbers || Array(10).fill('?')).map((num, i) => (
-                  <div key={i} className="w-6 md:w-8 h-10 md:h-12 flex items-center justify-center text-white font-bold text-sm md:text-base bg-purple-800/50 border-r border-purple-600">
+                  <div key={i} className="w-4 md:w-8 h-[32px] md:h-12 flex items-center justify-center text-white font-bold text-[10px] md:text-base bg-purple-800/50 border-r border-purple-600">
                     {num}
                   </div>
                 ))}
@@ -158,9 +232,9 @@ export default function Home() {
                           onClick={() => !game.isLocked && !cell && setSelectedCell({ row: rowIdx, col: colIdx })}
                           disabled={game.isLocked || !!cell}
                           className={`
-                            w-10 md:w-12 h-10 md:h-12 border border-purple-600/50 text-xs font-medium
+                            w-[32px] md:w-12 h-[32px] md:h-12 border border-purple-600/50 text-[8px] md:text-xs font-medium
                             transition-all duration-150 relative
-                            ${isSelected ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-purple-900' : ''}
+                            ${isSelected ? 'ring-2 ring-yellow-400 ring-offset-1 ring-offset-purple-900' : ''}
                             ${isWinner ? 'ring-2 ring-yellow-400 animate-pulse' : ''}
                             ${!cell && !game.isLocked ? 'hover:bg-purple-700/50 cursor-pointer' : ''}
                             ${cell ? 'text-white' : 'text-purple-400'}
@@ -181,6 +255,7 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
 
@@ -236,6 +311,25 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Mobile Player Scoreboard */}
+      {sortedPlayers.length > 0 && (
+        <div className="md:hidden bg-slate-800/50 rounded-xl p-4 mb-6">
+          <h3 className="text-white font-bold mb-3 text-sm uppercase tracking-wide">Players</h3>
+          <div className="flex flex-wrap gap-2">
+            {sortedPlayers.map(([name, count]) => (
+              <div
+                key={name}
+                className="flex items-center gap-2 px-3 py-1.5 rounded"
+                style={{ backgroundColor: getPlayerColor(name, allNames) }}
+              >
+                <span className="text-white text-sm font-medium">{name}</span>
+                <span className="text-white/80 text-xs font-bold bg-black/20 px-1.5 py-0.5 rounded">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Admin Panel Toggle */}
       <div className="text-center mb-4">
         <button
@@ -246,8 +340,45 @@ export default function Home() {
         </button>
       </div>
 
+      {/* Admin Password Prompt */}
+      {showAdmin && !isAdminUnlocked && (
+        <div className="bg-slate-800/50 rounded-xl p-6 max-w-sm mx-auto mb-6">
+          <h3 className="text-lg font-bold text-white mb-4">🔐 Admin Access</h3>
+          <input
+            type="password"
+            value={adminPassword}
+            onChange={(e) => setAdminPassword(e.target.value)}
+            placeholder="Enter admin password"
+            className="w-full px-4 py-3 rounded-lg bg-slate-700 text-white border border-slate-600 mb-4"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if (adminPassword === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+                  setIsAdminUnlocked(true)
+                } else {
+                  alert('Incorrect password')
+                  setAdminPassword('')
+                }
+              }
+            }}
+          />
+          <button
+            onClick={() => {
+              if (adminPassword === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+                setIsAdminUnlocked(true)
+              } else {
+                alert('Incorrect password')
+                setAdminPassword('')
+              }
+            }}
+            className="w-full py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium"
+          >
+            Unlock
+          </button>
+        </div>
+      )}
+
       {/* Admin Panel */}
-      {showAdmin && (
+      {showAdmin && isAdminUnlocked && (
         <div className="bg-slate-800/50 rounded-xl p-6 space-y-6">
           <h2 className="text-xl font-bold text-white">Admin Panel</h2>
 
@@ -274,6 +405,16 @@ export default function Home() {
               />
             </div>
           </div>
+
+          {/* Mock Data Button */}
+          {!game.isLocked && (
+            <button
+              onClick={fillMockData}
+              className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold"
+            >
+              🧪 Fill with Mock Data (10-12 players)
+            </button>
+          )}
 
           {/* Lock & Assign Numbers */}
           {!game.isLocked && (
