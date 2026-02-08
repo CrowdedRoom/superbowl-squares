@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { Game, createEmptyGame, shuffleNumbers, getWinner, getPlayerColor, Winner } from './types'
+import { database, ref, set, onValue } from './firebase'
 
-const STORAGE_KEY = 'superbowl-squares-game'
+const GAME_REF = 'game'
 
 export default function Home() {
   const [game, setGame] = useState<Game | null>(null)
@@ -13,22 +14,31 @@ export default function Home() {
   const [adminPassword, setAdminPassword] = useState('')
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false)
   const [winners, setWinners] = useState<Winner[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Load game from localStorage
+  // Load game from Firebase and listen for real-time updates
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      setGame(JSON.parse(saved))
-    } else {
-      setGame(createEmptyGame())
-    }
+    const gameRef = ref(database, GAME_REF)
+    
+    const unsubscribe = onValue(gameRef, (snapshot) => {
+      const data = snapshot.val()
+      if (data) {
+        setGame(data as Game)
+      } else {
+        // No game exists, create one
+        const newGame = createEmptyGame()
+        set(gameRef, newGame)
+        setGame(newGame)
+      }
+      setIsLoading(false)
+    })
+
+    return () => unsubscribe()
   }, [])
 
-  // Save game to localStorage
+  // Calculate winners when game changes
   useEffect(() => {
     if (game) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(game))
-      // Calculate winners
       const w: Winner[] = []
       for (const q of ['q1', 'q2', 'q3', 'final'] as const) {
         const winner = getWinner(game, q)
@@ -38,6 +48,13 @@ export default function Home() {
     }
   }, [game])
 
+  // Helper to save game to Firebase
+  const saveGame = (newGame: Game) => {
+    const gameRef = ref(database, GAME_REF)
+    set(gameRef, newGame)
+  }
+
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center text-white text-xl">Loading game... 🏈</div>
   if (!game) return <div className="p-8 text-white">Loading...</div>
 
   const allNames = game.grid.flat().filter(Boolean) as string[]
@@ -55,18 +72,20 @@ export default function Home() {
     if (!game || !selectedCell || !playerName.trim() || game.isLocked) return
     const newGrid = game.grid.map((row) => [...row])
     newGrid[selectedCell.row][selectedCell.col] = playerName.trim()
-    setGame({ ...game, grid: newGrid })
+    const newGame = { ...game, grid: newGrid }
+    saveGame(newGame)
     setSelectedCell(null)
   }
 
   function lockAndAssignNumbers() {
     if (!game) return
-    setGame({
+    const newGame = {
       ...game,
       isLocked: true,
       rowNumbers: shuffleNumbers(),
       colNumbers: shuffleNumbers()
-    })
+    }
+    saveGame(newGame)
   }
 
   function fillMockData() {
@@ -102,13 +121,13 @@ export default function Home() {
       }
     }
     
-    setGame({ ...game, grid: newGrid })
+    saveGame({ ...game, grid: newGrid })
   }
 
   function updateScore(quarter: 'q1' | 'q2' | 'q3' | 'final', team: 'teamA' | 'teamB', value: number) {
     if (!game) return
     const current = game.scores[quarter] || { teamA: 0, teamB: 0 }
-    setGame({
+    saveGame({
       ...game,
       scores: {
         ...game.scores,
@@ -117,10 +136,14 @@ export default function Home() {
     })
   }
 
+  function updateTeam(field: 'teamA' | 'teamB', value: string) {
+    if (!game) return
+    saveGame({ ...game, [field]: value })
+  }
+
   function resetGame() {
     if (typeof window !== 'undefined' && confirm('Are you sure? This will delete all data.')) {
-      localStorage.removeItem(STORAGE_KEY)
-      setGame(createEmptyGame())
+      saveGame(createEmptyGame())
     }
   }
 
@@ -132,6 +155,7 @@ export default function Home() {
         <p className="text-purple-300">
           {game.teamA} vs {game.teamB} • ${game.costPerSquare}/square • Pot: ${totalPot}
         </p>
+        <p className="text-green-400 text-xs mt-1">🟢 Live synced across all devices</p>
       </div>
 
       {/* Winners Banner */}
@@ -389,7 +413,7 @@ export default function Home() {
               <input
                 type="text"
                 value={game.teamA}
-                onChange={(e) => setGame({ ...game, teamA: e.target.value })}
+                onChange={(e) => updateTeam('teamA', e.target.value)}
                 className="w-full px-3 py-2 rounded bg-slate-700 text-white border border-slate-600"
                 disabled={game.isLocked}
               />
@@ -399,7 +423,7 @@ export default function Home() {
               <input
                 type="text"
                 value={game.teamB}
-                onChange={(e) => setGame({ ...game, teamB: e.target.value })}
+                onChange={(e) => updateTeam('teamB', e.target.value)}
                 className="w-full px-3 py-2 rounded bg-slate-700 text-white border border-slate-600"
                 disabled={game.isLocked}
               />
