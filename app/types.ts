@@ -40,9 +40,9 @@ export function getPlayerColor(name: string, allNames: string[]): string {
 export function createEmptyGame(): Game {
   return {
     id: crypto.randomUUID(),
-    teamA: 'Chiefs',
-    teamB: 'Eagles',
-    costPerSquare: 5,
+    teamA: 'Patriots',
+    teamB: 'Seahawks',
+    costPerSquare: 2,
     payouts: { q1: 25, q2: 25, q3: 25, final: 25 },
     grid: Array(10).fill(null).map(() => Array(10).fill(null)),
     rowNumbers: null,

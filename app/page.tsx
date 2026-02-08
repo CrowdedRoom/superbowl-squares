@@ -43,7 +43,7 @@ export default function Home() {
   const totalPot = claimedCount * game.costPerSquare
 
   function claimSquare() {
-    if (!selectedCell || !playerName.trim() || game.isLocked) return
+    if (!game || !selectedCell || !playerName.trim() || game.isLocked) return
     const newGrid = game.grid.map((row) => [...row])
     newGrid[selectedCell.row][selectedCell.col] = playerName.trim()
     setGame({ ...game, grid: newGrid })
@@ -51,6 +51,7 @@ export default function Home() {
   }
 
   function lockAndAssignNumbers() {
+    if (!game) return
     setGame({
       ...game,
       isLocked: true,
@@ -60,6 +61,7 @@ export default function Home() {
   }
 
   function updateScore(quarter: 'q1' | 'q2' | 'q3' | 'final', team: 'teamA' | 'teamB', value: number) {
+    if (!game) return
     const current = game.scores[quarter] || { teamA: 0, teamB: 0 }
     setGame({
       ...game,
@@ -71,7 +73,7 @@ export default function Home() {
   }
 
   function resetGame() {
-    if (confirm('Are you sure? This will delete all data.')) {
+    if (typeof window !== 'undefined' && confirm('Are you sure? This will delete all data.')) {
       localStorage.removeItem(STORAGE_KEY)
       setGame(createEmptyGame())
     }
