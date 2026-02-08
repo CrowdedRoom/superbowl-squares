@@ -47,11 +47,24 @@ export default function Home() {
           ? Object.values(gameData.colNumbers as Record<string, number>)
           : null
         
+        // Ensure scores object exists with proper structure
+        const scores = (gameData.scores as Game['scores']) || {}
+        
         setGame({
-          ...gameData,
+          teamA: (gameData.teamA as string) || 'Team A',
+          teamB: (gameData.teamB as string) || 'Team B',
+          costPerSquare: (gameData.costPerSquare as number) || 10,
+          isLocked: (gameData.isLocked as boolean) || false,
           grid,
           rowNumbers,
           colNumbers,
+          scores: {
+            q1: scores.q1 || { teamA: 0, teamB: 0 },
+            q2: scores.q2 || { teamA: 0, teamB: 0 },
+            q3: scores.q3 || { teamA: 0, teamB: 0 },
+            final: scores.final || { teamA: 0, teamB: 0 },
+          },
+          payouts: (gameData.payouts as Game['payouts']) || { q1: 100, q2: 100, q3: 100, final: 200 },
         } as Game)
       } else {
         // No game exists, create one
@@ -67,11 +80,13 @@ export default function Home() {
 
   // Calculate winners when game changes
   useEffect(() => {
-    if (game) {
+    if (game && game.scores && game.grid) {
       const w: Winner[] = []
       for (const q of ['q1', 'q2', 'q3', 'final'] as const) {
-        const winner = getWinner(game, q)
-        if (winner) w.push(winner)
+        if (game.scores[q]) {
+          const winner = getWinner(game, q)
+          if (winner) w.push(winner)
+        }
       }
       setWinners(w)
     }
